@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>말랑 뽀모도로</title>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#fff6f0; --card:#ffffff; --ink:#5b4a4a; --muted:#a8918b; --track:#f6e4dd;
+    --focus:#ff9eb5; --short:#7fd1b9; --long:#96c3f2;
+    --accent:var(--focus);
+  }
+  body.short{--accent:var(--short)}
+  body.long{--accent:var(--long)}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg);
+    background-image:radial-gradient(#ffe1e8 1.5px,transparent 1.5px);
+    background-size:22px 22px;
+    font-family:"Jua",system-ui,sans-serif; color:var(--ink);
+    display:flex; align-items:center; justify-content:center; padding:16px;
+    transition:background-color .4s;
+  }
+  .card{
+    width:100%; max-width:420px; background:var(--card); border-radius:36px;
+    padding:28px 24px 24px; text-align:center;
+    box-shadow:0 10px 0 #f3dcd3, 0 20px 40px rgba(240,150,160,.18);
+  }
+  .tabs{display:flex; gap:6px; background:var(--track); padding:5px; border-radius:999px}
+  .tabs button{
+    flex:1; border:0; background:transparent; font:inherit; font-size:15px; color:var(--muted);
+    padding:9px 0; border-radius:999px; cursor:pointer; transition:.2s;
+  }
+  .tabs button.on{background:#fff; color:var(--ink); box-shadow:0 2px 0 rgba(0,0,0,.06)}
+  .stage{position:relative; width:280px; height:280px; margin:22px auto 6px}
+  .ring{position:absolute; inset:0; transform:rotate(-90deg)}
+  .ring circle{fill:none; stroke-width:14; stroke-linecap:round}
+  .ring .bg{stroke:var(--track)}
+  .ring .fg{stroke:var(--accent); transition:stroke-dashoffset .5s linear, stroke .4s}
+  .buddy{
+    position:absolute; inset:34px; border-radius:50%; overflow:hidden; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; background:#fffaf7;
+  }
+  .buddy img,.buddy svg{width:100%; height:100%; object-fit:cover}
+  .buddy.drag{outline:4px dashed var(--accent); outline-offset:-4px}
+  .running .buddy > *{animation:wobble 2.4s ease-in-out infinite}
+  .done .buddy > *{animation:hop .5s ease-in-out infinite alternate}
+  @keyframes wobble{0%,100%{transform:rotate(-3deg) scale(1)}50%{transform:rotate(3deg) scale(1.03)}}
+  @keyframes hop{from{transform:translateY(0)}to{transform:translateY(-10px)}}
+  .time{font-size:64px; letter-spacing:2px; margin:8px 0 0; line-height:1}
+  .msg{color:var(--muted); font-size:17px; min-height:24px; margin:8px 0 18px}
+  .controls{display:flex; gap:10px; justify-content:center}
+  .btn{
+    border:0; font:inherit; cursor:pointer; border-radius:20px; padding:14px 0;
+    font-size:20px; transition:transform .1s;
+  }
+  .btn:active{transform:translateY(3px)}
+  .main{flex:1; background:var(--accent); color:#fff; box-shadow:0 5px 0 rgba(0,0,0,.12)}
+  .sub{width:60px; background:var(--track); color:var(--ink); box-shadow:0 5px 0 #ead2c9}
+  .dots{display:flex; gap:8px; justify-content:center; margin:20px 0 4px}
+  .dots span{width:14px; height:14px; border-radius:50%; background:var(--track); transition:.3s}
+  .dots span.on{background:var(--focus)}
+  .count{color:var(--muted); font-size:14px}
+  details{margin-top:18px; text-align:left; background:#fff9f6; border-radius:20px; padding:4px 16px}
+  summary{cursor:pointer; padding:10px 0; color:var(--muted); list-style:none; text-align:center}
+  summary::-webkit-details-marker{display:none}
+  .row{display:flex; align-items:center; justify-content:space-between; margin:10px 0; gap:10px}
+  .row input[type=number]{width:70px; font:inherit; font-size:16px; text-align:center; border:2px solid var(--track); border-radius:12px; padding:6px; color:var(--ink)}
+  .row input[type=checkbox]{width:20px;height:20px;accent-color:var(--focus)}
+  .imgrow button{font:inherit; font-size:14px; border:0; border-radius:12px; padding:7px 10px; cursor:pointer; background:var(--track); color:var(--ink)}
+  .hint{font-size:13px; color:var(--muted); margin:6px 0 12px; line-height:1.5}
+  @media (max-width:380px){.stage{width:240px;height:240px}.time{font-size:54px}}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div class="tabs">
+    <button data-mode="focus" class="on">집중</button>
+    <button data-mode="short">짧은 휴식</button>
+    <button data-mode="long">긴 휴식</button>
+  </div>
+
+  <div class="stage">
+    <svg class="ring" viewBox="0 0 280 280">
+      <circle class="bg" cx="140" cy="140" r="126"/>
+      <circle class="fg" id="fg" cx="140" cy="140" r="126"/>
+    </svg>
+    <div class="buddy" id="buddy" title="클릭하거나 이미지를 끌어다 놓으면 캐릭터 이미지를 바꿀 수 있어요"></div>
+  </div>
+
+  <div class="time" id="time">25:00</div>
+  <div class="msg" id="msg">준비됐으면 시작해볼까?</div>
+
+  <div class="controls">
+    <button class="btn sub" id="reset" title="처음으로">↺</button>
+    <button class="btn main" id="toggle">시작</button>
+    <button class="btn sub" id="skip" title="다음으로">⏭</button>
+  </div>
+
+  <div class="dots" id="dots"><span></span><span></span><span></span><span></span></div>
+  <div class="count" id="count">오늘 완료한 뽀모도로 0개</div>
+
+  <details>
+    <summary>⚙ 설정 · 이미지 바꾸기</summary>
+    <div class="row"><span>집중 (분)</span><input type="number" id="m-focus" min="1" max="120"></div>
+    <div class="row"><span>짧은 휴식 (분)</span><input type="number" id="m-short" min="1" max="60"></div>
+    <div class="row"><span>긴 휴식 (분)</span><input type="number" id="m-long" min="1" max="60"></div>
+    <div class="row"><span>다음 타이머 자동 시작</span><input type="checkbox" id="auto"></div>
+    <div class="row"><span>알림 소리</span><input type="checkbox" id="sound"></div>
+    <hr style="border:0;border-top:2px dashed var(--track);margin:14px 0">
+    <div class="row imgrow"><span>집중 이미지</span><span><button data-pick="focus">선택</button> <button data-clear="focus">기본</button></span></div>
+    <div class="row imgrow"><span>짧은 휴식 이미지</span><span><button data-pick="short">선택</button> <button data-clear="short">기본</button></span></div>
+    <div class="row imgrow"><span>긴 휴식 이미지</span><span><button data-pick="rest">선택</button> <button data-clear="rest">기본</button></span></div>
+    <div class="row imgrow"><span>완료 이미지</span><span><button data-pick="done">선택</button> <button data-clear="done">기본</button></span></div>
+    <p class="hint">기본 그림은 images 폴더의 focus.png · short.png · rest.png · done.png 예요. 가운데 그림을 클릭하거나 이미지를 끌어다 놓으면 지금 상태의 그림이 바뀌고, '기본'을 누르면 원래 그림으로 돌아가요.</p>
+  </details>
+  <input type="file" id="file" accept="image/*" hidden>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const store = {
+    get(k, d){ try{ const v = localStorage.getItem('pomo_'+k); return v===null ? d : JSON.parse(v); }catch{ return d; } },
+    set(k, v){ try{ localStorage.setItem('pomo_'+k, JSON.stringify(v)); }catch(e){ alert('이미지가 너무 커서 저장하지 못했어요. 더 작은 이미지를 써주세요.'); } }
+  };
+
+  // ---------- 기본 캐릭터 (오리지널 '말랑이') ----------
+  function buddySVG(face){
+    const eyes = {
+      focus:`<path d="M92 118 q10 -6 20 0" /><path d="M148 118 q10 -6 20 0" />`,
+      rest:`<path d="M90 118 q12 9 24 0" /><path d="M146 118 q12 9 24 0" />`,
+      done:`<path d="M90 122 q12 -14 24 0" /><path d="M146 122 q12 -14 24 0" />`,
+      idle:`<circle cx="102" cy="118" r="7" fill="#5b4a4a" stroke="none"/><circle cx="158" cy="118" r="7" fill="#5b4a4a" stroke="none"/><circle cx="104" cy="115" r="2.2" fill="#fff" stroke="none"/><circle cx="160" cy="115" r="2.2" fill="#fff" stroke="none"/>`
+    }[face];
+    const mouth = {
+      focus:`<path d="M124 140 h12" />`,
+      rest:`<path d="M124 140 q6 5 12 0" />`,
+      done:`<path d="M118 136 q12 18 24 0 z" fill="#ff8fa3" />`,
+      idle:`<path d="M124 138 q6 6 12 0" />`
+    }[face];
+    const extra = face==='rest'
+      ? `<text x="188" y="70" font-family="Jua" font-size="26" fill="#96c3f2">z</text><text x="206" y="50" font-family="Jua" font-size="18" fill="#96c3f2">z</text>`
+      : face==='done'
+      ? `<text x="40" y="78" font-size="26">✨</text><text x="190" y="70" font-size="22">✨</text>`
+      : face==='focus' ? `<path d="M186 96 q6 10 0 16 q-6 -6 0 -16z" fill="#bfe3ff" stroke="none"/>` : '';
+    return `<svg viewBox="0 0 260 260" xmlns="http://www.w3.org/2000/svg">
+      <rect width="260" height="260" fill="#fffaf7"/>
+      <ellipse cx="130" cy="214" rx="74" ry="10" fill="#f6e4dd"/>
+      <path d="M130 58 q-4 -22 -22 -26 q14 18 22 26z" fill="#9ad9a8"/>
+      <path d="M130 58 q6 -24 28 -24 q-14 16 -28 24z" fill="#7cc98f"/>
+      <path d="M44 150 C44 86 84 58 130 58 C176 58 216 86 216 150 C216 196 182 212 130 212 C78 212 44 196 44 150Z" fill="#ffe4d6" stroke="#f2c4b0" stroke-width="3"/>
+      <ellipse cx="86" cy="140" rx="15" ry="9" fill="#ffb3c1" opacity=".75"/>
+      <ellipse cx="174" cy="140" rx="15" ry="9" fill="#ffb3c1" opacity=".75"/>
+      <g fill="none" stroke="#5b4a4a" stroke-width="4.5" stroke-linecap="round">${eyes}${mouth}</g>
+      <ellipse cx="80" cy="196" rx="14" ry="9" fill="#ffe4d6" stroke="#f2c4b0" stroke-width="3"/>
+      <ellipse cx="180" cy="196" rx="14" ry="9" fill="#ffe4d6" stroke="#f2c4b0" stroke-width="3"/>
+      ${extra}
+    </svg>`;
+  }
+
+  // 기본 이미지: images 폴더 (집중=공부, 휴식=잠, 완료=응원)
+  const DEFAULT_IMG = {
+    focus:{src:'images/focus.png', fit:'contain'},
+    short:{src:'images/short.png', fit:'cover'},
+    rest: {src:'images/rest.png',  fit:'cover'},
+    done: {src:'images/done.png',  fit:'contain'}
+  };
+
+  // ---------- 상태 ----------
+  const MODES = { focus:'집중', short:'짧은 휴식', long:'긴 휴식' };
+  let mins = store.get('mins', {focus:25, short:5, long:15});
+  let settings = store.get('settings', {auto:false, sound:true});
+  let mode = 'focus', running = false, finished = false;
+  let remaining = mins.focus*60, endAt = 0, tick = null;
+  const today = new Date().toDateString();
+  let stats = store.get('stats', {day:today, done:0, streak:0});
+  if (stats.day !== today) stats = {day:today, done:0, streak:0};
+
+  const C = 2*Math.PI*126;
+  $('fg').style.strokeDasharray = C;
+
+  const msgs = {
+    focus:['조금만 더 힘내자!','집중 모드 ON','차근차근 하고 있어','넌 잘하고 있어'],
+    short:['잠깐 쉬어가자~','물 한 잔 마시기!','기지개 쭉~'],
+    long:['푹 쉬어도 돼!','오늘 진짜 열심히 했다','간식 타임?']
+  };
+  const pick = a => a[Math.floor(Math.random()*a.length)];
+
+  function face(){
+    if (finished) return 'done';
+    if (!running && remaining === mins[mode]*60) return 'idle';
+    return mode==='focus' ? 'focus' : 'rest';
+  }
+  function slot(f){
+    if (f==='done') return mode==='focus' ? 'done' : 'focus'; // 집중 끝 = 응원, 휴식 끝 = 다시 공부
+    return mode==='focus' ? 'focus' : mode==='short' ? 'short' : 'rest';
+  }
+
+  let lastFace = '';
+  function renderBuddy(force){
+    const f = face();
+    const key = f + mode;
+    if (!force && key === lastFace) return;
+    lastFace = key;
+    const s = slot(f);
+    const img = store.get('img_'+s, null);
+    const def = DEFAULT_IMG[s];
+    const el = $('buddy');
+    if (img) { el.innerHTML = `<img src="${img}" alt="">`; return; }
+    el.innerHTML = `<img src="${def.src}" alt="" style="object-fit:${def.fit};background:#fff;${def.fit==='contain'?'padding:14px':''}">`;
+    el.querySelector('img').onerror = () => { el.innerHTML = buddySVG(f); };
+  }
+
+  const fmt = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+
+  function render(){
+    const total = mins[mode]*60;
+    $('time').textContent = fmt(remaining);
+    $('fg').style.strokeDashoffset = C * (1 - remaining/total);
+    $('toggle').textContent = finished ? '다음으로' : running ? '일시정지' : (remaining<total ? '계속하기' : '시작');
+    document.body.className = mode;
+    $('card').classList.toggle('running', running);
+    $('card').classList.toggle('done', finished);
+    document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.mode===mode));
+    document.querySelectorAll('#dots span').forEach((d,i) => d.classList.toggle('on', i < stats.streak%4 || (stats.streak>0 && stats.streak%4===0 && mode==='long')));
+    $('count').textContent = `오늘 완료한 뽀모도로 ${stats.done}개`;
+    document.title = running ? `${fmt(remaining)} · ${MODES[mode]}` : '말랑 뽀모도로';
+    renderBuddy();
+  }
+
+  function setMode(m, keepMsg){
+    clearInterval(tick); running = false; finished = false;
+    mode = m; remaining = mins[m]*60;
+    if (!keepMsg) $('msg').textContent = m==='focus' ? '준비됐으면 시작해볼까?' : pick(msgs[m]);
+    render();
+  }
+
+  function start(){
+    if (finished) return next();
+    running = true; endAt = Date.now() + remaining*1000;
+    $('msg').textContent = pick(msgs[mode]);
+    clearInterval(tick);
+    tick = setInterval(() => {
+      remaining = Math.max(0, Math.round((endAt - Date.now())/1000));
+      if (remaining === 0) complete(); else render();
+    }, 250);
+    render();
+  }
+  function pause(){ running = false; clearInterval(tick); $('msg').textContent = '잠깐 멈춤'; render(); }
+
+  function complete(){
+    clearInterval(tick); running = false; finished = true; remaining = 0;
+    if (mode==='focus'){ stats.done++; stats.streak++; store.set('stats', stats); }
+    const text = mode==='focus' ? '해냈다! 이제 쉬자 🎉' : '휴식 끝! 다시 달려볼까?';
+    $('msg').textContent = text;
+    if (settings.sound) chime();
+    notify(text);
+    render();
+    if (settings.auto) setTimeout(() => { if (finished) { next(); start(); } }, 2500);
+  }
+
+  function next(){
+    const nm = mode==='focus' ? (stats.streak>0 && stats.streak%4===0 ? 'long' : 'short') : 'focus';
+    setMode(nm);
+  }
+
+  function chime(){
+    try{
+      const ac = new (window.AudioContext||window.webkitAudioContext)();
+      [659,784,988,1319].forEach((f,i) => {
+        const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime + i*0.16;
+        o.type='sine'; o.frequency.value=f;
+        g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.25,t+.02); g.gain.exponentialRampToValueAtTime(.001,t+.5);
+        o.connect(g).connect(ac.destination); o.start(t); o.stop(t+.55);
+      });
+    }catch{}
+  }
+  function notify(text){
+    try{ if ('Notification' in window && Notification.permission==='granted') new Notification('말랑 뽀모도로', {body:text}); }catch{}
+  }
+
+  // ---------- 이벤트 ----------
+  $('toggle').onclick = () => {
+    try{ if ('Notification' in window && Notification.permission==='default') Notification.requestPermission(); }catch{}
+    running ? pause() : start();
+  };
+  $('reset').onclick = () => setMode(mode);
+  $('skip').onclick = () => { if (mode==='focus' && !finished) { /* 건너뛰기는 카운트 안 함 */ } next(); };
+  document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => setMode(b.dataset.mode));
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName==='INPUT') return;
+    if (e.code==='Space'){ e.preventDefault(); $('toggle').click(); }
+  });
+
+  // 설정
+  ['focus','short','long'].forEach(k => {
+    const el = $('m-'+k); el.value = mins[k];
+    el.onchange = () => {
+      mins[k] = Math.min(+el.max, Math.max(1, Math.round(+el.value)||mins[k])); el.value = mins[k];
+      store.set('mins', mins);
+      if (k===mode && !running) { remaining = mins[k]*60; finished=false; render(); }
+    };
+  });
+  ['auto','sound'].forEach(k => {
+    $(k).checked = settings[k];
+    $(k).onchange = () => { settings[k] = $(k).checked; store.set('settings', settings); };
+  });
+
+  // 이미지 바꾸기
+  let target = null;
+  function loadImage(file, s){
+    if (!file || !file.type.startsWith('image/')) return;
+    const r = new FileReader();
+    r.onload = () => {
+      if (file.type === 'image/gif') { store.set('img_'+s, r.result); renderBuddy(true); return; }
+      const im = new Image();
+      im.onload = () => {
+        const max = 420, sc = Math.min(1, max/Math.max(im.width, im.height));
+        const cv = document.createElement('canvas');
+        cv.width = im.width*sc; cv.height = im.height*sc;
+        cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+        store.set('img_'+s, cv.toDataURL('image/png'));
+        renderBuddy(true);
+      };
+      im.src = r.result;
+    };
+    r.readAsDataURL(file);
+  }
+  $('file').onchange = e => { loadImage(e.target.files[0], target); e.target.value=''; };
+  $('buddy').onclick = () => { target = slot(face()); $('file').click(); };
+  document.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { target = b.dataset.pick; $('file').click(); });
+  document.querySelectorAll('[data-clear]').forEach(b => b.onclick = () => {
+    try{ localStorage.removeItem('pomo_img_'+b.dataset.clear); }catch{}
+    renderBuddy(true);
+  });
+  const bd = $('buddy');
+  bd.ondragover = e => { e.preventDefault(); bd.classList.add('drag'); };
+  bd.ondragleave = () => bd.classList.remove('drag');
+  bd.ondrop = e => { e.preventDefault(); bd.classList.remove('drag'); loadImage(e.dataTransfer.files[0], slot(face())); };
+
+  render();
+})();
+</script>
+</body>
+</html>
